@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~/notes</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --fg: #d4d4d4;
+    --dim: #6b6b6b;
+    --accent: #00ff9c;
+    --accent-2: #ff2e88;
+    --accent-3: #ffb800;
+    --line: #1f1f1f;
+    --hover: #141414;
+    --done: #3a3a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    padding: 20px 18px 18px;
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+    font-size: 9px;
+    color: var(--dim);
+  }
+  header .sync { color: var(--accent); }
+  header .sync.off { color: var(--accent-2); }
+  header .sync.old { color: var(--accent-2); }
+  header span.dim-old { color: var(--accent-2); }
+
+  nav.tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tab {
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s;
+  }
+  .tab:hover { color: var(--fg); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab .count {
+    color: var(--dim);
+    font-size: 9px;
+    margin-left: 6px;
+  }
+
+  .list-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding-top: 6px;
+  }
+  .list { list-style: none; }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background .12s;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .item:hover { background: var(--hover); }
+  .item .marker {
+    color: var(--dim);
+    font-size: 9px;
+    margin-top: 1px;
+    min-width: 28px;
+    flex-shrink: 0;
+  }
+  .item.done .marker { color: var(--accent); }
+  .item.progress .marker { color: var(--accent-3); }
+
+  .item .text {
+    flex: 1;
+    word-break: break-word;
+    white-space: pre-wrap;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .item.done .text {
+    color: var(--done);
+    text-decoration: line-through;
+  }
+  .item.progress .text {
+    color: var(--accent-3);
+  }
+  .item .del {
+    color: var(--dim);
+    background: none;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0;
+    transition: opacity .15s, color .15s;
+    font-size: 9px;
+  }
+  .item:hover .del { opacity: 1; }
+  .item .del:hover { color: var(--accent-2); }
+  .item .time {
+    font-size: 10px;
+    color: var(--dim);
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+
+  .item.pressing {
+    background: var(--hover);
+    position: relative;
+  }
+  .item.pressing::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: 0;
+    height: 2px;
+    background: var(--accent-3);
+    width: 0;
+    animation: fill 500ms linear forwards;
+  }
+  @keyframes fill { to { width: 100%; } }
+
+  .empty {
+    color: var(--dim);
+    padding: 24px 4px;
+    font-size: 9px;
+  }
+  .empty::before { content: '// '; color: var(--accent-2); }
+
+  .note-edit {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 9px;
+    padding: 8px 10px;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+    line-height: 1.6;
+  }
+
+  /* CONSOLE OUTPUT (above prompt) */
+  .console {
+    padding: 0 0 8px;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .console:empty { display: none; }
+  .console .line { color: var(--dim); white-space: pre-wrap; word-break: break-word; }
+  .console .ok { color: var(--accent); }
+  .console .err { color: var(--accent-2); }
+  .console .warn { color: var(--accent-3); }
+  .console .echo { color: var(--fg); }
+  .console .echo .user { color: var(--accent); }
+  .console .echo .path { color: var(--fg); }
+  .console .echo .dollar { color: var(--accent); }
+
+  .bottom {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    margin-top: 8px;
+  }
+  .prompt-line {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 0 8px;
+    flex-wrap: nowrap;
+  }
+  .prompt {
+    color: var(--dim);
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 9px;
+  }
+  .prompt .user { color: var(--accent); }
+  .prompt .path { color: var(--fg); }
+  .prompt .dollar {
+    color: var(--accent);
+    margin: 0 6px 0 4px;
+  }
+  .prompt.confirm {
+    color: var(--accent-3);
+  }
+  input.add {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 0;
+    min-width: 40px;
+    caret-color: var(--accent);
+  }
+  input.add::placeholder { color: var(--dim); opacity: .55; }
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background: var(--accent);
+    vertical-align: middle;
+    margin-left: 2px;
+    animation: blink 1s steps(2) infinite;
+    flex-shrink: 0;
+  }
+  .cursor.hidden { display: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 9px;
+    color: var(--dim);
+    padding-top: 6px;
+    gap: 8px;
+  }
+  .footer-row .hex { color: var(--accent); }
+  .footer-row .clear {
+    background: none;
+    border: none;
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 9px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .footer-row .clear:hover { color: var(--accent-2); }
+  .footer-row .hint {
+    font-size: 10px;
+    color: var(--dim);
+    opacity: .6;
+    text-align: center;
+    flex: 1;
+  }
+
+  /* Toast / mini notice */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 8px 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 100;
+    max-width: 90vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.err { border-color: var(--accent-2); color: var(--accent-2); }
+
+  @media (max-width: 480px) {
+    body { padding: 14px 12px 12px; }
+    .prompt { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span>[<span id="syncIndicator" class="sync">sync:ok</span>]</span>
+  <span id="syncTime">no backups</span>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="tasks">
+    ./tasks <span class="count" id="tasksCount">0</span>
+  </button>
+  <button class="tab" data-tab="notes">
+    ./notes <span class="count" id="notesCount">0</span>
+  </button>
+</nav>
+
+<div class="list-wrap">
+  <ul class="list" id="list"></ul>
+</div>
+
+<div class="bottom">
+  <div class="console" id="console"></div>
+  <div class="prompt-line">
+    <span class="prompt" id="promptEl">
+      <span class="user">max</span>@<span>admin</span>:<span class="path" id="promptPath">~/tasks</span><span class="dollar">$</span>
+    </span>
+    <input id="addInput" class="add" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <span class="cursor" id="cursor"></span>
+  </div>
+  <div class="footer-row">
+    <span>0x<span class="hex" id="hexCount">000000</span></span>
+    <span class="hint" id="hint">./export ./import ./history</span>
+    <button class="clear" id="clearDone">rm --done</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const STORE_KEY_TASKS = 'app_tasks_v2';
+  const STORE_KEY_NOTES = 'app_notes_v2';
+
+  // Storage abstraction: window.storage (Claude artifacts) -> localStorage fallback
+  const storage = {
+    async get(key) {
+      if (typeof window.storage !== 'undefined' && window.storage && window.storage.get) {
+        try {
+          return await window.storage.get(key);
+        } catch (e) { /* fall through to localStorage */ }
+      }
+      const v = localStorage.getItem(key);
+      if (v === null) return null;
+      return { key, value: v, shared: false };
+    },
+    async set(key, value) {
+      if (typeof window.storage !== 'undefined' && window.storage && window.storage.set) {
+        try {
+          return await window.storage.set(key, value);
+        } catch (e) { /* fall through */ }
+      }
+      localStorage.setItem(key, value);
+      return { key, value, shared: false };
+    }
+  };
+
+  let state = {
+    tab: 'tasks',
+    tasks: [],
+    notes: [],
+    editingId: null,
+    // command mode
+    awaitingInput: null,  // null | { question, onAnswer(value), validate }
+    suppressTapUntil: 0,  // timestamp until which tap events should be ignored (prevents phantom tap after longpress)
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+  const listEl = $('#list');
+  const inputEl = $('#addInput');
+  const cursorEl = $('#cursor');
+  const syncIndicator = $('#syncIndicator');
+  const syncTime = $('#syncTime');
+  const promptEl = $('#promptEl');
+  const consoleEl = $('#console');
+  const toastEl = $('#toast');
+
+  const uid = () => '0x' + Math.random().toString(16).slice(2, 8).toUpperCase();
+
+  // ---------- CONSOLE OUTPUT ----------
+  function logLine(text, cls) {
+    const div = document.createElement('div');
+    div.className = 'line' + (cls ? ' ' + cls : '');
+    div.textContent = text;
+    consoleEl.appendChild(div);
+    // keep only last 6 lines visible
+    while (consoleEl.children.length > 6) consoleEl.removeChild(consoleEl.firstChild);
+  }
+  function logEcho(cmd) {
+    const div = document.createElement('div');
+    div.className = 'line echo';
+    div.innerHTML = `<span class="user">max</span>@local:<span class="path">~/${state.tab}</span><span class="dollar"> $ </span>${escapeHtml(cmd)}`;
+    consoleEl.appendChild(div);
+    while (consoleEl.children.length > 6) consoleEl.removeChild(consoleEl.firstChild);
+  }
+  function clearConsole() { consoleEl.innerHTML = ''; }
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- TOAST ----------
+  let toastTimer = null;
+  function toast(msg, isErr) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('err', !!isErr);
+    toastEl.classList.add('visible');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 2400);
+  }
+
+  // ---------- SYNC STATUS ----------
+  // detect storage backend on init
+  let storageBackend = 'local';
+  if (typeof window.storage !== 'undefined' && window.storage && window.storage.get) {
+    storageBackend = 'cloud';
+  }
+
+  function setSyncStatus(ok, label) {
+    if (label) {
+      syncIndicator.textContent = label;
+    } else {
+      syncIndicator.textContent = ok ? (storageBackend === 'cloud' ? 'sync:ok' : 'local:ok') : 'sync:err';
+    }
+    syncIndicator.classList.toggle('off', !ok);
+    // syncTime is now controlled by updateLastBackupDisplay (shows last backup date)
+  }
+
+  // ---------- STORAGE ----------
+  async function loadAll() {
+    setSyncStatus(true, 'sync:load');
+    try {
+      try {
+        const r = await storage.get(STORE_KEY_TASKS);
+        const arr = r ? JSON.parse(r.value) : [];
+        state.tasks = arr.map(t => ({
+          id: t.id,
+          text: t.text,
+          status: t.status || (t.done ? 'done' : 'todo'),
+          created: t.created,
+        }));
+      } catch { state.tasks = []; }
+      try {
+        const r = await storage.get(STORE_KEY_NOTES);
+        state.notes = r ? JSON.parse(r.value) : [];
+      } catch { state.notes = []; }
+      setSyncStatus(true);
+    } catch (e) {
+      setSyncStatus(false);
+    }
+    render();
+  }
+
+  async function saveTasks() {
+    setSyncStatus(true, 'sync:...');
+    try {
+      await storage.set(STORE_KEY_TASKS, JSON.stringify(state.tasks));
+      setSyncStatus(true);
+    } catch (e) { setSyncStatus(false); }
+  }
+
+  async function saveNotes() {
+    setSyncStatus(true, 'sync:...');
+    try {
+      await storage.set(STORE_KEY_NOTES, JSON.stringify(state.notes));
+      setSyncStatus(true);
+    } catch (e) { setSyncStatus(false); }
+  }
+
+  function fmtTime(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return d.toTimeString().slice(0, 5);
+    return d.toISOString().slice(5, 10).replace('-', '.');
+  }
+  function markerFor(task) {
+    if (task.status === 'done') return '[x]';
+    if (task.status === 'progress') return '[~]';
+    return '[ ]';
+  }
+
+  // ---------- RENDER ----------
+  function render() {
+    const todo = state.tasks.filter(t => t.status === 'todo').length;
+    const prog = state.tasks.filter(t => t.status === 'progress').length;
+    $('#tasksCount').textContent = `[${todo}+${prog}/${state.tasks.length}]`;
+    $('#notesCount').textContent = `[${state.notes.length}]`;
+
+    const sectionTotal = state.tab === 'tasks' ? state.tasks.length : state.notes.length;
+    $('#hexCount').textContent = sectionTotal.toString(16).toUpperCase().padStart(6, '0');
+
+    if (state.awaitingInput) {
+      $('#hint').textContent = 'awaiting input...';
+    } else {
+      $('#hint').textContent = './export ./import ./history';
+    }
+
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === state.tab);
+    });
+
+    updatePromptUI();
+
+    listEl.innerHTML = '';
+    const items = state.tab === 'tasks' ? state.tasks : state.notes;
+
+    if (items.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'empty';
+      empty.textContent = 'empty — type below';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    const sorted = state.tab === 'tasks'
+      ? [...items].sort((a, b) => {
+          const order = { progress: 0, todo: 1, done: 2 };
+          return (order[a.status] - order[b.status]) || (b.created - a.created);
+        })
+      : [...items].sort((a, b) => b.created - a.created);
+
+    sorted.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'item';
+      if (state.tab === 'tasks') {
+        if (item.status === 'done') li.classList.add('done');
+        if (item.status === 'progress') li.classList.add('progress');
+      }
+
+      const marker = document.createElement('span');
+      marker.className = 'marker';
+      marker.textContent = state.tab === 'tasks' ? markerFor(item) : '#';
+      li.appendChild(marker);
+
+      const textWrap = document.createElement('div');
+      textWrap.style.flex = '1';
+      textWrap.style.minWidth = '0';
+
+      if (state.tab === 'notes' && state.editingId === item.id) {
+        const ta = document.createElement('textarea');
+        ta.className = 'note-edit';
+        ta.value = item.text;
+        ta.addEventListener('blur', async () => {
+          item.text = ta.value.trim() || item.text;
+          state.editingId = null;
+          await saveNotes();
+          render();
+        });
+        ta.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { state.editingId = null; render(); }
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) ta.blur();
+        });
+        textWrap.appendChild(ta);
+        setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
+      } else {
+        const text = document.createElement('div');
+        text.className = 'text';
+        text.textContent = item.text;
+        textWrap.appendChild(text);
+      }
+      li.appendChild(textWrap);
+
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = fmtTime(item.created);
+      li.appendChild(time);
+
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '✕';
+      del.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (state.tab === 'tasks') {
+          state.tasks = state.tasks.filter(t => t.id !== item.id);
+          await saveTasks();
+        } else {
+          state.notes = state.notes.filter(n => n.id !== item.id);
+          await saveNotes();
+        }
+        render();
+      });
+      li.appendChild(del);
+
+      let pressTimer = null;
+      let longFired = false;
+      const startPress = (e) => {
+        if (e.target === del) return;
+        // ignore touches that arrive within suppress window (phantom tap after longpress)
+        if (Date.now() < state.suppressTapUntil) return;
+        longFired = false;
+        if (state.tab === 'tasks') {
+          li.classList.add('pressing');
+          pressTimer = setTimeout(async () => {
+            longFired = true;
+            li.classList.remove('pressing');
+            item.status = item.status === 'progress' ? 'todo' : 'progress';
+            await saveTasks();
+            // block any incoming pointerup / pointerdown for the next 700ms
+            // (covers the user lifting finger after the long-press triggered)
+            state.suppressTapUntil = Date.now() + 700;
+            render();
+            if (navigator.vibrate) navigator.vibrate(15);
+          }, 500);
+        }
+      };
+      const cancelPress = () => {
+        li.classList.remove('pressing');
+        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      };
+      const endPress = async (e) => {
+        if (e && e.target === del) return;
+        const wasLong = longFired;
+        cancelPress();
+        if (wasLong) return;
+        // also suppress if we're inside the global suppress window
+        if (Date.now() < state.suppressTapUntil) return;
+        if (state.tab === 'tasks') {
+          item.status = item.status === 'done' ? 'todo' : 'done';
+          await saveTasks();
+          render();
+        } else {
+          if (state.editingId !== item.id) {
+            state.editingId = item.id;
+            render();
+          }
+        }
+      };
+      li.addEventListener('pointerdown', startPress);
+      li.addEventListener('pointerup', endPress);
+      li.addEventListener('pointerleave', cancelPress);
+      li.addEventListener('pointercancel', cancelPress);
+      li.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      listEl.appendChild(li);
+    });
+  }
+
+  function updatePromptUI() {
+    if (state.awaitingInput) {
+      promptEl.classList.add('confirm');
+      promptEl.innerHTML = escapeHtml(state.awaitingInput.question) + '&nbsp;';
+      inputEl.placeholder = '';
+    } else {
+      promptEl.classList.remove('confirm');
+      promptEl.innerHTML = `<span class="user">max</span>@<span>admin</span>:<span class="path">${state.tab === 'tasks' ? '~/tasks' : '~/notes'}</span><span class="dollar">$</span>`;
+      inputEl.placeholder = '';
+    }
+  }
+
+  // ---------- COMMANDS ----------
+  // Returns true if input was handled as a command, false otherwise.
+  async function tryHandleCommand(raw) {
+    const text = raw.trim();
+    // command pattern: "./<cmd>"
+    const m = text.match(/^\.\/(\S+)\s*(.*)$/);
+    if (!m) return false;
+    const cmd = m[1];
+    const args = m[2].trim();
+
+    logEcho(text);
+
+    switch (cmd) {
+      case 'export':
+        await cmdExport();
+        break;
+      case 'import':
+        await cmdImport();
+        break;
+      case 'c':
+        clearConsole();
+        break;
+      case 'history':
+        await cmdHistory();
+        break;
+      case 'list':
+        await cmdList();
+        break;
+      default:
+        logLine(`./${cmd}: command not found`, 'err');
+        logLine('available: ./export · ./import · ./history · ./list · c', 'warn');
+    }
+    return true;
+  }
+
+  // ---------- BACKUP ----------
+  function buildBackup() {
+    return {
+      version: 1,
+      app: 'notes',
+      exported_at: new Date().toISOString(),
+      tasks: state.tasks,
+      notes: state.notes,
+    };
+  }
+
+  const STORE_KEY_HISTORY = 'app_backup_history_v1';
+  let backupHistory = [];  // array of { ts, count_tasks, count_notes }
+
+  async function loadHistory() {
+    try {
+      const r = await storage.get(STORE_KEY_HISTORY);
+      backupHistory = r ? JSON.parse(r.value) : [];
+    } catch { backupHistory = []; }
+    updateLastBackupDisplay();
+  }
+
+  async function saveHistory() {
+    try {
+      await storage.set(STORE_KEY_HISTORY, JSON.stringify(backupHistory));
+    } catch (e) { /* ignore */ }
+  }
+
+  async function recordBackup() {
+    const entry = {
+      ts: Date.now(),
+      tasks: state.tasks.length,
+      notes: state.notes.length,
+    };
+    backupHistory.unshift(entry);
+    // keep last 30
+    if (backupHistory.length > 30) backupHistory = backupHistory.slice(0, 30);
+    await saveHistory();
+    updateLastBackupDisplay();
+  }
+
+  function fmtBackupDate(ts) {
+    const d = new Date(ts);
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}`;
+  }
+
+  function updateLastBackupDisplay() {
+    if (backupHistory.length === 0) {
+      syncTime.textContent = 'no backups';
+      syncIndicator.classList.remove('old');
+      return;
+    }
+    const lastTs = backupHistory[0].ts;
+    const ageMs = Date.now() - lastTs;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    if (ageMs > weekMs) {
+      syncTime.textContent = fmtBackupDate(lastTs) + ' (old)';
+      syncIndicator.classList.add('old');
+    } else {
+      syncTime.textContent = fmtBackupDate(lastTs);
+      syncIndicator.classList.remove('old');
+    }
+  }
+  
+
+  async function cmdHistory() {
+    if (backupHistory.length === 0) {
+      logLine('no backups yet. run ./export to create one.', 'warn');
+      return;
+    }
+    logLine(`backup history (${backupHistory.length}):`, 'ok');
+    backupHistory.slice(0, 10).forEach((entry, i) => {
+      const marker = i === 0 ? '*' : ' ';
+      logLine(`  ${marker} ${fmtBackupDate(entry.ts)}   t:${entry.tasks} n:${entry.notes}`);
+    });
+    if (backupHistory.length > 10) {
+      logLine(`  ... +${backupHistory.length - 10} more`, 'warn');
+    }
+  }
+
+  async function cmdExport() {
+    askConfirm('create a backup file?', async (ans) => {
+      if (ans !== 'y') {
+        logLine('aborted.', 'warn');
+        return;
+      }
+      logLine('writing /storage/Download/MyTasks/backup.json ...', 'ok');
+      const payload = buildBackup();
+      const json = JSON.stringify(payload, null, 2);
+
+      // Try Android bridge first (when packaged as WebView APK)
+      let written = false;
+      try {
+        if (window.AndroidBackup && typeof window.AndroidBackup.writeBackup === 'function') {
+          const result = window.AndroidBackup.writeBackup(json);
+          written = !!result;
+        }
+      } catch (e) { /* fallthrough */ }
+
+      if (written) {
+        logLine('ok: backup.json saved.', 'ok');
+        toast('backup saved → Download/MyTasks/');
+        await recordBackup();
+      } else {
+        // Browser fallback: download via blob
+        try {
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'backup.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          logLine('ok: backup.json downloaded (browser mode).', 'ok');
+          toast('backup downloaded');
+          await recordBackup();
+        } catch (e) {
+          logLine('err: failed to write file.', 'err');
+          toast('backup failed', true);
+        }
+      }
+    });
+  }
+
+  async function cmdImport() {
+    askConfirm('import latest backup from MyTasks folder?', async (ans) => {
+      if (ans !== 'y') { logLine('aborted.', 'warn'); return; }
+
+      // Try native bridge first (APK mode)
+      if (window.AndroidBackup && typeof window.AndroidBackup.readBackup === 'function') {
+        try {
+          const txt = window.AndroidBackup.readBackup('');
+          if (!txt) { logLine('err: no backup found or read failed.', 'err'); return; }
+          await applyImport(txt);
+        } catch (e) {
+          logLine('err: ' + e.message, 'err');
+        }
+        return;
+      }
+
+      // Browser fallback: file picker
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = 'application/json,.json';
+      inp.onchange = async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const txt = await f.text();
+        await applyImport(txt);
+      };
+      inp.click();
+    });
+  }
+
+  async function applyImport(txt) {
+    try {
+      const data = JSON.parse(txt);
+      if (!data.tasks || !data.notes) throw new Error('invalid format');
+      const tMap = new Map(state.tasks.map(t => [t.id, t]));
+      data.tasks.forEach(t => tMap.set(t.id, t));
+      state.tasks = [...tMap.values()];
+      const nMap = new Map(state.notes.map(n => [n.id, n]));
+      data.notes.forEach(n => nMap.set(n.id, n));
+      state.notes = [...nMap.values()];
+      await saveTasks(); await saveNotes();
+      render();
+      logLine(`ok: imported ${data.tasks.length} tasks, ${data.notes.length} notes.`, 'ok');
+      toast('imported');
+    } catch (err) {
+      logLine('err: ' + err.message, 'err');
+      toast('import failed', true);
+    }
+  }
+
+  async function cmdList() {
+    if (!(window.AndroidBackup && typeof window.AndroidBackup.listBackups === 'function')) {
+      logLine('err: file listing only works in APK mode.', 'err');
+      return;
+    }
+    try {
+      const result = window.AndroidBackup.listBackups();
+      if (!result) { logLine('no backup files in /Download/MyTasks/', 'warn'); return; }
+      const files = result.split('\n');
+      logLine(`backup files (${files.length}):`, 'ok');
+      files.slice(0, 15).forEach((name, i) => {
+        const marker = i === 0 ? '*' : ' ';
+        logLine(`  ${marker} ${name}`);
+      });
+      if (files.length > 15) logLine(`  ... +${files.length - 15} more`, 'warn');
+    } catch (e) {
+      logLine('err: ' + e.message, 'err');
+    }
+  }
+
+  // ---------- CONFIRM (y/n) ----------
+  function askConfirm(question, onAnswer) {
+    state.awaitingInput = {
+      question: question + ' [y/n]',
+      validate: (v) => /^[yn]$/i.test(v.trim()),
+      onAnswer: (v) => {
+        onAnswer(v.trim().toLowerCase());
+      }
+    };
+    inputEl.value = '';
+    updatePromptUI();
+    render();
+    inputEl.focus();
+  }
+
+  // ---------- INPUT HANDLING ----------
+  inputEl.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    const raw = inputEl.value;
+
+    // 1) awaiting y/n answer
+    if (state.awaitingInput) {
+      const ans = raw.trim();
+      const cur = state.awaitingInput;
+      logEcho(ans);
+      if (!cur.validate(ans)) {
+        logLine('expected: y or n', 'err');
+        inputEl.value = '';
+        return;
+      }
+      state.awaitingInput = null;
+      inputEl.value = '';
+      updatePromptUI();
+      render();
+      cur.onAnswer(ans);
+      updateCursor();
+      return;
+    }
+
+    if (!raw.trim()) return;
+
+    // 2) command?
+    const handled = await tryHandleCommand(raw);
+    if (handled) {
+      inputEl.value = '';
+      updateCursor();
+      return;
+    }
+
+    // 3) regular task/note input
+    const text = raw.trim();
+    const base = { id: uid(), text, created: Date.now() };
+    if (state.tab === 'tasks') {
+      state.tasks.unshift({ ...base, status: 'todo' });
+      await saveTasks();
+    } else {
+      state.notes.unshift(base);
+      await saveNotes();
+    }
+    inputEl.value = '';
+    render();
+    updateCursor();
+  });
+
+  function updateCursor() {
+    const hasFocus = document.activeElement === inputEl;
+    const hasVal = inputEl.value.length > 0;
+    cursorEl.classList.toggle('hidden', hasFocus || hasVal);
+  }
+  inputEl.addEventListener('focus', updateCursor);
+  inputEl.addEventListener('blur', updateCursor);
+  inputEl.addEventListener('input', updateCursor);
+
+  document.querySelector('.prompt-line').addEventListener('click', () => inputEl.focus());
+
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      if (state.awaitingInput) return;  // don't switch while confirming
+      state.tab = t.dataset.tab;
+      state.editingId = null;
+      render();
+      updateCursor();
+    });
+  });
+
+  $('#clearDone').addEventListener('click', async () => {
+    if (state.tab !== 'tasks') return;
+    const before = state.tasks.length;
+    state.tasks = state.tasks.filter(t => t.status !== 'done');
+    if (state.tasks.length !== before) {
+      await saveTasks();
+      render();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== inputEl &&
+        !(document.activeElement && document.activeElement.tagName === 'TEXTAREA')) {
+      e.preventDefault(); inputEl.focus();
+    }
+    if (e.key === 'Tab' && document.activeElement === inputEl && !e.shiftKey && !state.awaitingInput) {
+      e.preventDefault();
+      state.tab = state.tab === 'tasks' ? 'notes' : 'tasks';
+      render();
+    }
+  });
+
+  loadAll().then(async () => {
+    await loadHistory();
+    updateCursor();
+  });
+</script>
+</body>
+</html>
